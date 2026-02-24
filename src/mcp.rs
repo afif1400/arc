@@ -1,15 +1,15 @@
-/// Arc MCP (Model Context Protocol) server — enables AI agents to
-/// validate, render, and convert arc diagrams via JSON-RPC over stdio.
+//! Arc MCP (Model Context Protocol) server — enables AI agents to
+//! validate, render, and convert arc diagrams via JSON-RPC over stdio.
 
 use serde::{Deserialize, Serialize};
 use std::io::{self, BufRead, Write};
 
-use crate::parser;
-use crate::validator;
+use crate::fmt;
 use crate::layout;
+use crate::parser;
 use crate::svg;
 use crate::themes;
-use crate::fmt;
+use crate::validator;
 
 // ── MCP Protocol Types ──────────────────────────────────────────
 
@@ -108,17 +108,28 @@ fn tools_list() -> serde_json::Value {
 fn execute_tool(name: &str, args: &serde_json::Value) -> Result<serde_json::Value, String> {
     match name {
         "arc_validate" => {
-            let code = args.get("code").and_then(|v| v.as_str()).ok_or("Missing 'code' parameter")?;
+            let code = args
+                .get("code")
+                .and_then(|v| v.as_str())
+                .ok_or("Missing 'code' parameter")?;
             let parse_result = parser::parse(code);
-            let (validation, _resolved) = validator::validate(&parse_result.document, &parse_result.diagnostics);
+            let (validation, _resolved) =
+                validator::validate(&parse_result.document, &parse_result.diagnostics);
             Ok(serde_json::to_value(&validation).unwrap())
         }
         "arc_render" => {
-            let code = args.get("code").and_then(|v| v.as_str()).ok_or("Missing 'code' parameter")?;
-            let theme_name = args.get("theme").and_then(|v| v.as_str()).unwrap_or("light");
+            let code = args
+                .get("code")
+                .and_then(|v| v.as_str())
+                .ok_or("Missing 'code' parameter")?;
+            let theme_name = args
+                .get("theme")
+                .and_then(|v| v.as_str())
+                .unwrap_or("light");
 
             let parse_result = parser::parse(code);
-            let (_validation, resolved) = validator::validate(&parse_result.document, &parse_result.diagnostics);
+            let (_validation, resolved) =
+                validator::validate(&parse_result.document, &parse_result.diagnostics);
             let layout_result = layout::compute_layout(&resolved);
             let theme = themes::get_theme(theme_name);
             let svg_output = svg::render_svg(&layout_result, &theme);
@@ -130,14 +141,15 @@ fn execute_tool(name: &str, args: &serde_json::Value) -> Result<serde_json::Valu
             }))
         }
         "arc_format" => {
-            let code = args.get("code").and_then(|v| v.as_str()).ok_or("Missing 'code' parameter")?;
+            let code = args
+                .get("code")
+                .and_then(|v| v.as_str())
+                .ok_or("Missing 'code' parameter")?;
             let parse_result = parser::parse(code);
             let formatted = fmt::format_document(&parse_result.document);
             Ok(serde_json::json!({ "formatted": formatted }))
         }
-        "arc_grammar" => {
-            Ok(serde_json::json!({ "grammar": GRAMMAR_SPEC }))
-        }
+        "arc_grammar" => Ok(serde_json::json!({ "grammar": GRAMMAR_SPEC })),
         _ => Err(format!("Unknown tool: {}", name)),
     }
 }
@@ -151,7 +163,9 @@ pub fn run_mcp_server() -> io::Result<()> {
 
     for line in reader.lines() {
         let line = line?;
-        if line.trim().is_empty() { continue; }
+        if line.trim().is_empty() {
+            continue;
+        }
 
         let request: JsonRpcRequest = match serde_json::from_str(&line) {
             Ok(r) => r,
@@ -160,7 +174,10 @@ pub fn run_mcp_server() -> io::Result<()> {
                     jsonrpc: "2.0".into(),
                     id: None,
                     result: None,
-                    error: Some(JsonRpcError { code: -32700, message: format!("Parse error: {}", e) }),
+                    error: Some(JsonRpcError {
+                        code: -32700,
+                        message: format!("Parse error: {}", e),
+                    }),
                 };
                 let json = serde_json::to_string(&response).unwrap();
                 writeln!(stdout, "{}", json)?;
@@ -170,74 +187,75 @@ pub fn run_mcp_server() -> io::Result<()> {
         };
 
         let response = match request.method.as_str() {
-            "initialize" => {
-                JsonRpcResponse {
-                    jsonrpc: "2.0".into(),
-                    id: request.id,
-                    result: Some(serde_json::json!({
-                        "protocolVersion": "2024-11-05",
-                        "capabilities": {
-                            "tools": {}
-                        },
-                        "serverInfo": {
-                            "name": "arc",
-                            "version": env!("CARGO_PKG_VERSION"),
-                        }
-                    })),
-                    error: None,
-                }
-            }
+            "initialize" => JsonRpcResponse {
+                jsonrpc: "2.0".into(),
+                id: request.id,
+                result: Some(serde_json::json!({
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {
+                        "tools": {}
+                    },
+                    "serverInfo": {
+                        "name": "arc",
+                        "version": env!("CARGO_PKG_VERSION"),
+                    }
+                })),
+                error: None,
+            },
             "notifications/initialized" => continue,
-            "tools/list" => {
-                JsonRpcResponse {
-                    jsonrpc: "2.0".into(),
-                    id: request.id,
-                    result: Some(tools_list()),
-                    error: None,
-                }
-            }
+            "tools/list" => JsonRpcResponse {
+                jsonrpc: "2.0".into(),
+                id: request.id,
+                result: Some(tools_list()),
+                error: None,
+            },
             "tools/call" => {
-                let tool_name = request.params.get("name").and_then(|v| v.as_str()).unwrap_or("");
-                let arguments = request.params.get("arguments").cloned().unwrap_or(serde_json::json!({}));
+                let tool_name = request
+                    .params
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let arguments = request
+                    .params
+                    .get("arguments")
+                    .cloned()
+                    .unwrap_or(serde_json::json!({}));
 
                 match execute_tool(tool_name, &arguments) {
-                    Ok(result) => {
-                        JsonRpcResponse {
-                            jsonrpc: "2.0".into(),
-                            id: request.id,
-                            result: Some(serde_json::json!({
-                                "content": [{
-                                    "type": "text",
-                                    "text": serde_json::to_string_pretty(&result).unwrap()
-                                }]
-                            })),
-                            error: None,
-                        }
-                    }
-                    Err(e) => {
-                        JsonRpcResponse {
-                            jsonrpc: "2.0".into(),
-                            id: request.id,
-                            result: Some(serde_json::json!({
-                                "content": [{
-                                    "type": "text",
-                                    "text": format!("Error: {}", e)
-                                }],
-                                "isError": true
-                            })),
-                            error: None,
-                        }
-                    }
+                    Ok(result) => JsonRpcResponse {
+                        jsonrpc: "2.0".into(),
+                        id: request.id,
+                        result: Some(serde_json::json!({
+                            "content": [{
+                                "type": "text",
+                                "text": serde_json::to_string_pretty(&result).unwrap()
+                            }]
+                        })),
+                        error: None,
+                    },
+                    Err(e) => JsonRpcResponse {
+                        jsonrpc: "2.0".into(),
+                        id: request.id,
+                        result: Some(serde_json::json!({
+                            "content": [{
+                                "type": "text",
+                                "text": format!("Error: {}", e)
+                            }],
+                            "isError": true
+                        })),
+                        error: None,
+                    },
                 }
             }
-            _ => {
-                JsonRpcResponse {
-                    jsonrpc: "2.0".into(),
-                    id: request.id,
-                    result: None,
-                    error: Some(JsonRpcError { code: -32601, message: format!("Method not found: {}", request.method) }),
-                }
-            }
+            _ => JsonRpcResponse {
+                jsonrpc: "2.0".into(),
+                id: request.id,
+                result: None,
+                error: Some(JsonRpcError {
+                    code: -32601,
+                    message: format!("Method not found: {}", request.method),
+                }),
+            },
         };
 
         let json = serde_json::to_string(&response).unwrap();

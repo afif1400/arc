@@ -71,7 +71,12 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Render { input, output, format, theme } => {
+        Commands::Render {
+            input,
+            output,
+            format,
+            theme,
+        } => {
             let source = read_input(input.as_deref());
             let theme_name = theme.as_deref();
 
@@ -90,13 +95,15 @@ fn main() {
             }
         }
 
-        Commands::Validate { input, format, fix: _ } => {
+        Commands::Validate {
+            input,
+            format,
+            fix: _,
+        } => {
             let source = read_input(input.as_deref());
             let parse_result = arc_lang::parser::parse(&source);
-            let (validation, _resolved) = arc_lang::validator::validate(
-                &parse_result.document,
-                &parse_result.diagnostics,
-            );
+            let (validation, _resolved) =
+                arc_lang::validator::validate(&parse_result.document, &parse_result.diagnostics);
 
             if format == "json" {
                 let json = serde_json::to_string_pretty(&validation).unwrap();
@@ -109,17 +116,32 @@ fn main() {
                     for diag in &validation.errors {
                         print_diagnostic(diag);
                     }
-                    let errors = validation.errors.iter()
-                        .filter(|d| d.severity == arc_lang::ast::Severity::Error).count();
-                    let warnings = validation.errors.iter()
-                        .filter(|d| d.severity == arc_lang::ast::Severity::Warning).count();
-                    let infos = validation.errors.iter()
-                        .filter(|d| d.severity == arc_lang::ast::Severity::Info).count();
+                    let errors = validation
+                        .errors
+                        .iter()
+                        .filter(|d| d.severity == arc_lang::ast::Severity::Error)
+                        .count();
+                    let warnings = validation
+                        .errors
+                        .iter()
+                        .filter(|d| d.severity == arc_lang::ast::Severity::Warning)
+                        .count();
+                    let infos = validation
+                        .errors
+                        .iter()
+                        .filter(|d| d.severity == arc_lang::ast::Severity::Info)
+                        .count();
 
                     println!();
-                    if errors > 0 { println!("\x1b[31m{} error(s)\x1b[0m", errors); }
-                    if warnings > 0 { println!("\x1b[33m{} warning(s)\x1b[0m", warnings); }
-                    if infos > 0 { println!("\x1b[36m{} info(s)\x1b[0m", infos); }
+                    if errors > 0 {
+                        println!("\x1b[31m{} error(s)\x1b[0m", errors);
+                    }
+                    if warnings > 0 {
+                        println!("\x1b[33m{} warning(s)\x1b[0m", warnings);
+                    }
+                    if infos > 0 {
+                        println!("\x1b[36m{} info(s)\x1b[0m", infos);
+                    }
                 }
 
                 if !validation.valid {
@@ -164,12 +186,10 @@ fn main() {
 
 fn read_input(path: Option<&std::path::Path>) -> String {
     match path {
-        Some(p) => {
-            fs::read_to_string(p).unwrap_or_else(|e| {
-                eprintln!("Error reading {}: {}", p.display(), e);
-                process::exit(1);
-            })
-        }
+        Some(p) => fs::read_to_string(p).unwrap_or_else(|e| {
+            eprintln!("Error reading {}: {}", p.display(), e);
+            process::exit(1);
+        }),
         None => {
             let mut buf = String::new();
             io::stdin().read_to_string(&mut buf).unwrap_or_else(|e| {
@@ -198,13 +218,15 @@ fn write_output(path: Option<&std::path::Path>, content: &str) {
 
 fn print_diagnostic(diag: &arc_lang::ast::Diagnostic) {
     let (prefix, color) = match diag.severity {
-        arc_lang::ast::Severity::Error   => ("error", "\x1b[31m"),
+        arc_lang::ast::Severity::Error => ("error", "\x1b[31m"),
         arc_lang::ast::Severity::Warning => ("warn ", "\x1b[33m"),
-        arc_lang::ast::Severity::Info    => ("info ", "\x1b[36m"),
+        arc_lang::ast::Severity::Info => ("info ", "\x1b[36m"),
     };
 
-    eprintln!("{}{}[{}]\x1b[0m line {}:{} — {}",
-        color, prefix, diag.code, diag.line, diag.col, diag.message);
+    eprintln!(
+        "{}{}[{}]\x1b[0m line {}:{} — {}",
+        color, prefix, diag.code, diag.line, diag.col, diag.message
+    );
 
     if let Some(ref suggestion) = diag.suggestion {
         eprintln!("  \x1b[2m→ suggestion: {}\x1b[0m", suggestion);

@@ -1,5 +1,5 @@
-/// Arc SVG renderer — produces clean, professional SVG output.
-/// Hand-written SVG generation for zero dependencies and full control.
+//! Arc SVG renderer — produces clean, professional SVG output.
+//! Hand-written SVG generation for zero dependencies and full control.
 
 use crate::ast::{ArrowKind, NodeType};
 use crate::layout::{LayoutEdge, LayoutGroup, LayoutNode, LayoutResult};
@@ -87,7 +87,10 @@ fn render_node(node: &LayoutNode, theme: &Theme, svg: &mut String) {
     let r = 10.0; // corner radius
 
     // Node group
-    svg.push_str(&format!(r#"  <g class="node" data-id="{}">"#, escape_xml(&node.id)));
+    svg.push_str(&format!(
+        r#"  <g class="node" data-id="{}">"#,
+        escape_xml(&node.id)
+    ));
     svg.push('\n');
 
     // Shape based on node type
@@ -160,9 +163,21 @@ fn render_node(node: &LayoutNode, theme: &Theme, svg: &mut String) {
     svg.push_str("  </g>\n");
 }
 
-fn render_cylinder(svg: &mut String, x: f64, y: f64, w: f64, h: f64, style: &crate::themes::NodeStyle, dashed: bool) {
+fn render_cylinder(
+    svg: &mut String,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+    style: &crate::themes::NodeStyle,
+    dashed: bool,
+) {
     let ry = 8.0; // ellipse height for cylinder top/bottom
-    let dash = if dashed { r#" stroke-dasharray="4,3""# } else { "" };
+    let dash = if dashed {
+        r#" stroke-dasharray="4,3""#
+    } else {
+        ""
+    };
 
     // Body
     svg.push_str(&format!(
@@ -182,7 +197,14 @@ fn render_cylinder(svg: &mut String, x: f64, y: f64, w: f64, h: f64, style: &cra
     svg.push('\n');
 }
 
-fn render_parallelogram(svg: &mut String, x: f64, y: f64, w: f64, h: f64, style: &crate::themes::NodeStyle) {
+fn render_parallelogram(
+    svg: &mut String,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+    style: &crate::themes::NodeStyle,
+) {
     let skew = 15.0;
     svg.push_str(&format!(
         r#"    <path d="M{x0},{y0} L{x1},{y0} L{x2},{y1} L{x3},{y1} Z" fill="{fill}" stroke="{stroke}" stroke-width="1.5" filter="url(#shadow)"/>"#,
@@ -192,7 +214,14 @@ fn render_parallelogram(svg: &mut String, x: f64, y: f64, w: f64, h: f64, style:
     svg.push('\n');
 }
 
-fn render_user_shape(svg: &mut String, x: f64, y: f64, w: f64, h: f64, style: &crate::themes::NodeStyle) {
+fn render_user_shape(
+    svg: &mut String,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+    style: &crate::themes::NodeStyle,
+) {
     // Rounded rect with a small person icon area
     let r = 10.0;
     svg.push_str(&format!(
@@ -203,7 +232,14 @@ fn render_user_shape(svg: &mut String, x: f64, y: f64, w: f64, h: f64, style: &c
     svg.push('\n');
 }
 
-fn render_cloud_rect(svg: &mut String, x: f64, y: f64, w: f64, h: f64, style: &crate::themes::NodeStyle) {
+fn render_cloud_rect(
+    svg: &mut String,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+    style: &crate::themes::NodeStyle,
+) {
     let r = 10.0;
     svg.push_str(&format!(
         r#"    <rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{r}" ry="{r}" fill="{fill}" stroke="{stroke}" stroke-width="1.5" stroke-dasharray="6,3" filter="url(#shadow)"/>"#,
@@ -216,12 +252,18 @@ fn render_cloud_rect(svg: &mut String, x: f64, y: f64, w: f64, h: f64, style: &c
 // ── Edge rendering ──────────────────────────────────────────────
 
 fn render_edge(edge: &LayoutEdge, theme: &Theme, svg: &mut String) {
-    if edge.points.len() < 2 { return; }
+    if edge.points.len() < 2 {
+        return;
+    }
 
     let cs = &theme.connection_style;
     let (stroke, marker, dash) = match edge.arrow_kind {
         ArrowKind::Solid => (&cs.stroke, "url(#arrow)", "".to_string()),
-        ArrowKind::Dashed => (&cs.dashed_stroke, "url(#arrow-dashed)", r#" stroke-dasharray="6,4""#.to_string()),
+        ArrowKind::Dashed => (
+            &cs.dashed_stroke,
+            "url(#arrow-dashed)",
+            r#" stroke-dasharray="6,4""#.to_string(),
+        ),
         ArrowKind::Bidirectional => (&cs.stroke, "url(#arrow)", "".to_string()),
         ArrowKind::Blocked => (&cs.blocked_stroke, "url(#arrow-blocked)", "".to_string()),
     };
@@ -319,7 +361,11 @@ fn render_groups_recursive(groups: &[LayoutGroup], theme: &Theme, svg: &mut Stri
         let stroke = theme.group_stroke(group.depth);
         let dashed = group.tags.contains(&"dashed".to_string());
 
-        let dash_attr = if dashed { r#" stroke-dasharray="6,4""# } else { "" };
+        let dash_attr = if dashed {
+            r#" stroke-dasharray="6,4""#
+        } else {
+            ""
+        };
 
         svg.push_str(&format!(
             r#"  <rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{r}" ry="{r}" fill="{fill}" stroke="{stroke}" stroke-width="1"{dash}/>"#,
@@ -349,10 +395,10 @@ fn render_groups_recursive(groups: &[LayoutGroup], theme: &Theme, svg: &mut Stri
 
 fn escape_xml(s: &str) -> String {
     s.replace('&', "&amp;")
-     .replace('<', "&lt;")
-     .replace('>', "&gt;")
-     .replace('"', "&quot;")
-     .replace('\'', "&apos;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
 }
 
 fn truncate_label(s: &str, max: usize) -> String {

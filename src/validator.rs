@@ -1,5 +1,5 @@
-/// Arc validator — semantic validation with machine-readable JSON output.
-/// Designed for agent repair loops: clear error codes, actionable suggestions.
+//! Arc validator — semantic validation with machine-readable JSON output.
+//! Designed for agent repair loops: clear error codes, actionable suggestions.
 
 use crate::ast::*;
 use serde::{Deserialize, Serialize};
@@ -28,8 +28,14 @@ pub fn validate(doc: &Document, parse_diagnostics: &[Diagnostic]) -> (Validation
                 line: node.span.line,
                 col: node.span.col,
                 code: "E010".into(),
-                message: format!("Duplicate node ID '{}' (first declared at line {})", node.id, existing.span.line),
-                suggestion: Some(format!("Rename to '{}_2' or use a unique identifier", node.id)),
+                message: format!(
+                    "Duplicate node ID '{}' (first declared at line {})",
+                    node.id, existing.span.line
+                ),
+                suggestion: Some(format!(
+                    "Rename to '{}_2' or use a unique identifier",
+                    node.id
+                )),
                 severity: Severity::Error,
             });
         } else {
@@ -48,7 +54,10 @@ pub fn validate(doc: &Document, parse_diagnostics: &[Diagnostic]) -> (Validation
                     line: conn.span.line,
                     col: conn.span.col,
                     code: "W010".into(),
-                    message: format!("Node '{}' used but not declared, treating as service", ref_id),
+                    message: format!(
+                        "Node '{}' used but not declared, treating as service",
+                        ref_id
+                    ),
                     suggestion: Some(format!("Add: service {}", ref_id)),
                     severity: Severity::Warning,
                 });
@@ -81,7 +90,10 @@ pub fn validate(doc: &Document, parse_diagnostics: &[Diagnostic]) -> (Validation
                             line: group.span.line,
                             col: group.span.col,
                             code: "W011".into(),
-                            message: format!("Node '{}' referenced in group '{}' but not declared", id, group.label),
+                            message: format!(
+                                "Node '{}' referenced in group '{}' but not declared",
+                                id, group.label
+                            ),
                             suggestion: Some(format!("Add: service {}", id)),
                             severity: Severity::Warning,
                         });
@@ -102,7 +114,10 @@ pub fn validate(doc: &Document, parse_diagnostics: &[Diagnostic]) -> (Validation
                                 line: group.span.line,
                                 col: group.span.col,
                                 code: "W011".into(),
-                                message: format!("Node '{}' referenced in group '{}' but not declared", id, group.label),
+                                message: format!(
+                                    "Node '{}' referenced in group '{}' but not declared",
+                                    id, group.label
+                                ),
                                 suggestion: Some(format!("Add: service {}", id)),
                                 severity: Severity::Warning,
                             });
@@ -126,7 +141,13 @@ pub fn validate(doc: &Document, parse_diagnostics: &[Diagnostic]) -> (Validation
     }
 
     for group in &doc.groups {
-        check_group_refs(group, &declared, &mut auto_added, &mut diagnostics, &mut resolved.nodes);
+        check_group_refs(
+            group,
+            &declared,
+            &mut auto_added,
+            &mut diagnostics,
+            &mut resolved.nodes,
+        );
     }
 
     // 4. Check for unused nodes (declared but never connected or grouped)
@@ -138,10 +159,21 @@ pub fn validate(doc: &Document, parse_diagnostics: &[Diagnostic]) -> (Validation
     fn collect_group_member_ids<'a>(group: &'a Group, ids: &mut HashSet<&'a str>) {
         for member in &group.members {
             match member {
-                GroupMember::NodeRef(id) => { ids.insert(id); }
-                GroupMember::NodeRefList(list) => { for id in list { ids.insert(id); } }
-                GroupMember::Node(n) => { ids.insert(&n.id); }
-                GroupMember::Connection(c) => { ids.insert(&c.from); ids.insert(&c.to); }
+                GroupMember::NodeRef(id) => {
+                    ids.insert(id);
+                }
+                GroupMember::NodeRefList(list) => {
+                    for id in list {
+                        ids.insert(id);
+                    }
+                }
+                GroupMember::Node(n) => {
+                    ids.insert(&n.id);
+                }
+                GroupMember::Connection(c) => {
+                    ids.insert(&c.from);
+                    ids.insert(&c.to);
+                }
                 GroupMember::Group(g) => collect_group_member_ids(g, ids),
             }
         }
@@ -156,7 +188,10 @@ pub fn validate(doc: &Document, parse_diagnostics: &[Diagnostic]) -> (Validation
                 line: node.span.line,
                 col: node.span.col,
                 code: "I001".into(),
-                message: format!("Node '{}' is declared but never used in connections or groups", node.id),
+                message: format!(
+                    "Node '{}' is declared but never used in connections or groups",
+                    node.id
+                ),
                 suggestion: None,
                 severity: Severity::Info,
             });
@@ -179,12 +214,15 @@ pub fn validate(doc: &Document, parse_diagnostics: &[Diagnostic]) -> (Validation
 
     // Sort diagnostics by line, then severity
     diagnostics.sort_by(|a, b| {
-        a.line.cmp(&b.line)
+        a.line
+            .cmp(&b.line)
             .then(severity_order(&a.severity).cmp(&severity_order(&b.severity)))
     });
 
     let has_errors = diagnostics.iter().any(|d| d.severity == Severity::Error);
-    let fixable = diagnostics.iter().all(|d| d.suggestion.is_some() || d.severity != Severity::Error);
+    let fixable = diagnostics
+        .iter()
+        .all(|d| d.suggestion.is_some() || d.severity != Severity::Error);
 
     let result = ValidationResult {
         valid: !has_errors,

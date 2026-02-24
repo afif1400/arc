@@ -1,17 +1,18 @@
 pub mod ast;
-pub mod lexer;
-pub mod parser;
-pub mod validator;
+pub mod fmt;
 pub mod layout;
+pub mod lexer;
+pub mod mcp;
+pub mod parser;
 pub mod svg;
 pub mod themes;
-pub mod fmt;
-pub mod mcp;
+pub mod validator;
 
 /// Convenience: parse, validate, layout, and render in one call.
 pub fn render(source: &str, theme_name: Option<&str>) -> RenderOutput {
     let parse_result = parser::parse(source);
-    let (validation, resolved) = validator::validate(&parse_result.document, &parse_result.diagnostics);
+    let (validation, resolved) =
+        validator::validate(&parse_result.document, &parse_result.diagnostics);
     let layout_result = layout::compute_layout(&resolved);
     let theme = themes::get_theme(theme_name.unwrap_or(resolved.theme_name()));
     let svg_output = svg::render_svg(&layout_result, &theme);

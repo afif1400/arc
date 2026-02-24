@@ -1,4 +1,4 @@
-/// Arc formatter — pretty-prints .arc files with consistent style.
+//! Arc formatter — pretty-prints .arc files with consistent style.
 
 use crate::ast::*;
 
