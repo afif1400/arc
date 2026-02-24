@@ -1,6 +1,5 @@
 /// Arc layout engine — simplified Sugiyama-style layered layout,
 /// optimized for architecture diagrams (typically 5-40 nodes, hierarchical).
-
 use crate::ast::*;
 use std::collections::{HashMap, HashSet, VecDeque};
 
@@ -75,19 +74,39 @@ pub fn compute_layout(doc: &Document) -> LayoutResult {
         incoming.entry(id.clone()).or_default();
     }
     for conn in &doc.connections {
-        if conn.arrow == ArrowKind::Blocked { continue; }
-        outgoing.entry(conn.from.clone()).or_default().push(conn.to.clone());
-        if conn.arrow == ArrowKind::Bidirectional {
-            outgoing.entry(conn.to.clone()).or_default().push(conn.from.clone());
-            incoming.entry(conn.from.clone()).or_default().push(conn.to.clone());
+        if conn.arrow == ArrowKind::Blocked {
+            continue;
         }
-        incoming.entry(conn.to.clone()).or_default().push(conn.from.clone());
+        outgoing
+            .entry(conn.from.clone())
+            .or_default()
+            .push(conn.to.clone());
+        if conn.arrow == ArrowKind::Bidirectional {
+            outgoing
+                .entry(conn.to.clone())
+                .or_default()
+                .push(conn.from.clone());
+            incoming
+                .entry(conn.from.clone())
+                .or_default()
+                .push(conn.to.clone());
+        }
+        incoming
+            .entry(conn.to.clone())
+            .or_default()
+            .push(conn.from.clone());
     }
 
     // Step 1: Assign layers via BFS (longest path from sources)
     let mut layers: HashMap<String, usize> = HashMap::new();
-    let sources: Vec<String> = node_ids.iter()
-        .filter(|id| incoming.get(id.as_str()).map(|v| v.is_empty()).unwrap_or(true))
+    let sources: Vec<String> = node_ids
+        .iter()
+        .filter(|id| {
+            incoming
+                .get(id.as_str())
+                .map(|v| v.is_empty())
+                .unwrap_or(true)
+        })
         .cloned()
         .collect();
 
@@ -141,20 +160,28 @@ pub fn compute_layout(doc: &Document) -> LayoutResult {
     for _iteration in 0..4 {
         for l in 1..=max_layer {
             let prev_layer = &layer_nodes[l - 1];
-            let prev_positions: HashMap<String, f64> = prev_layer.iter().enumerate()
+            let prev_positions: HashMap<String, f64> = prev_layer
+                .iter()
+                .enumerate()
                 .map(|(i, id)| (id.clone(), i as f64))
                 .collect();
 
-            let mut barycenters: Vec<(String, f64)> = layer_nodes[l].iter().map(|id| {
-                let neighbors = incoming.get(id).cloned().unwrap_or_default();
-                let positions: Vec<f64> = neighbors.iter()
-                    .filter_map(|n| prev_positions.get(n).copied())
-                    .collect();
-                let bc = if positions.is_empty() { f64::MAX } else {
-                    positions.iter().sum::<f64>() / positions.len() as f64
-                };
-                (id.clone(), bc)
-            }).collect();
+            let mut barycenters: Vec<(String, f64)> = layer_nodes[l]
+                .iter()
+                .map(|id| {
+                    let neighbors = incoming.get(id).cloned().unwrap_or_default();
+                    let positions: Vec<f64> = neighbors
+                        .iter()
+                        .filter_map(|n| prev_positions.get(n).copied())
+                        .collect();
+                    let bc = if positions.is_empty() {
+                        f64::MAX
+                    } else {
+                        positions.iter().sum::<f64>() / positions.len() as f64
+                    };
+                    (id.clone(), bc)
+                })
+                .collect();
 
             barycenters.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
             layer_nodes[l] = barycenters.into_iter().map(|(id, _)| id).collect();
@@ -174,11 +201,16 @@ pub fn compute_layout(doc: &Document) -> LayoutResult {
         for (pos_idx, node_id) in nodes_in_layer.iter().enumerate() {
             let node = node_map.get(node_id.as_str());
             let has_tags = node.map(|n| !n.tags.is_empty()).unwrap_or(false);
-            let h = if has_tags { NODE_HEIGHT_WITH_TAGS } else { NODE_HEIGHT };
+            let h = if has_tags {
+                NODE_HEIGHT_WITH_TAGS
+            } else {
+                NODE_HEIGHT
+            };
 
             // Center smaller layers
             let total_extent = n as f64 * h + (n as f64 - 1.0) * node_gap;
-            let max_extent = max_nodes_in_layer as f64 * NODE_HEIGHT_WITH_TAGS + (max_nodes_in_layer as f64 - 1.0) * node_gap;
+            let max_extent = max_nodes_in_layer as f64 * NODE_HEIGHT_WITH_TAGS
+                + (max_nodes_in_layer as f64 - 1.0) * node_gap;
             let offset = (max_extent - total_extent) / 2.0;
 
             let (x, y) = match direction {
@@ -203,7 +235,8 @@ pub fn compute_layout(doc: &Document) -> LayoutResult {
 
             layout_nodes.push(LayoutNode {
                 id: node_id.clone(),
-                x, y,
+                x,
+                y,
                 width: NODE_WIDTH,
                 height: h,
                 node_type,
@@ -327,7 +360,8 @@ fn compute_group_bounds(
         // Recurse into sub-groups
         for member in &group.members {
             if let GroupMember::Group(sub) = member {
-                let sub_bounds = compute_group_bounds(&[sub.clone()], positions, depth + 1);
+                let sub_bounds =
+                    compute_group_bounds(std::slice::from_ref(sub), positions, depth + 1);
                 child_groups.extend(sub_bounds);
             }
         }
@@ -378,11 +412,22 @@ fn compute_group_bounds(
 fn collect_all_member_ids(group: &Group, ids: &mut HashSet<String>) {
     for member in &group.members {
         match member {
-            GroupMember::NodeRef(id) => { ids.insert(id.clone()); }
-            GroupMember::NodeRefList(list) => { ids.extend(list.iter().cloned()); }
-            GroupMember::Node(n) => { ids.insert(n.id.clone()); }
-            GroupMember::Connection(c) => { ids.insert(c.from.clone()); ids.insert(c.to.clone()); }
-            GroupMember::Group(g) => { collect_all_member_ids(g, ids); }
+            GroupMember::NodeRef(id) => {
+                ids.insert(id.clone());
+            }
+            GroupMember::NodeRefList(list) => {
+                ids.extend(list.iter().cloned());
+            }
+            GroupMember::Node(n) => {
+                ids.insert(n.id.clone());
+            }
+            GroupMember::Connection(c) => {
+                ids.insert(c.from.clone());
+                ids.insert(c.to.clone());
+            }
+            GroupMember::Group(g) => {
+                collect_all_member_ids(g, ids);
+            }
         }
     }
 }
@@ -404,8 +449,16 @@ fn edge_point(rx: f64, ry: f64, rw: f64, rh: f64, tx: f64, ty: f64) -> (f64, f64
     let half_h = rh / 2.0;
 
     // Find intersection with rectangle edges
-    let scale_x = if dx.abs() > 0.001 { half_w / dx.abs() } else { f64::MAX };
-    let scale_y = if dy.abs() > 0.001 { half_h / dy.abs() } else { f64::MAX };
+    let scale_x = if dx.abs() > 0.001 {
+        half_w / dx.abs()
+    } else {
+        f64::MAX
+    };
+    let scale_y = if dy.abs() > 0.001 {
+        half_h / dy.abs()
+    } else {
+        f64::MAX
+    };
     let scale = scale_x.min(scale_y);
 
     (cx + dx * scale, cy + dy * scale)

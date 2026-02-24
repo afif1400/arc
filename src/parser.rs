@@ -1,7 +1,6 @@
 /// Arc parser — transforms token stream into AST.
 /// Designed for maximum forgiveness: recovers from errors, skips bad lines,
 /// always produces a (possibly partial) Document.
-
 use crate::ast::*;
 use crate::lexer::{Token, TokenKind};
 
@@ -18,7 +17,11 @@ struct Parser {
 
 impl Parser {
     fn new(tokens: Vec<Token>) -> Self {
-        Self { tokens, pos: 0, diagnostics: Vec::new() }
+        Self {
+            tokens,
+            pos: 0,
+            diagnostics: Vec::new(),
+        }
     }
 
     fn peek(&self) -> Option<&Token> {
@@ -39,9 +42,7 @@ impl Parser {
 
     fn skip_newlines(&mut self) {
         while let Some(tok) = self.peek() {
-            if tok.kind == TokenKind::Newline {
-                self.pos += 1;
-            } else if matches!(tok.kind, TokenKind::Comment(_)) {
+            if tok.kind == TokenKind::Newline || matches!(tok.kind, TokenKind::Comment(_)) {
                 self.pos += 1;
             } else {
                 break;
@@ -79,9 +80,17 @@ impl Parser {
 
     fn current_span(&self) -> Span {
         if let Some(tok) = self.peek() {
-            Span { line: tok.line, col: tok.col, len: tok.len }
+            Span {
+                line: tok.line,
+                col: tok.col,
+                len: tok.len,
+            }
         } else if let Some(last) = self.tokens.last() {
-            Span { line: last.line, col: last.col + last.len, len: 0 }
+            Span {
+                line: last.line,
+                col: last.col + last.len,
+                len: 0,
+            }
         } else {
             Span::default()
         }
@@ -89,7 +98,8 @@ impl Parser {
 
     fn warn(&mut self, line: usize, col: usize, code: &str, msg: &str) {
         self.diagnostics.push(Diagnostic {
-            line, col,
+            line,
+            col,
             code: code.into(),
             message: msg.into(),
             suggestion: None,
@@ -97,9 +107,17 @@ impl Parser {
         });
     }
 
-    fn error(&mut self, line: usize, col: usize, code: &str, msg: &str, suggestion: Option<String>) {
+    fn error(
+        &mut self,
+        line: usize,
+        col: usize,
+        code: &str,
+        msg: &str,
+        suggestion: Option<String>,
+    ) {
         self.diagnostics.push(Diagnostic {
-            line, col,
+            line,
+            col,
             code: code.into(),
             message: msg.into(),
             suggestion,
@@ -115,7 +133,9 @@ impl Parser {
 
         while !self.at_end() {
             self.skip_newlines();
-            if self.at_end() { break; }
+            if self.at_end() {
+                break;
+            }
 
             let tok = self.peek().unwrap();
             match &tok.kind {
@@ -152,7 +172,7 @@ impl Parser {
                 // Unknown or unexpected
                 _ => {
                     let t = self.peek().unwrap();
-                    self.error(t.line, t.col, "E001", &format!("Unexpected token"), None);
+                    self.error(t.line, t.col, "E001", "Unexpected token", None);
                     self.skip_to_newline();
                 }
             }
@@ -172,7 +192,13 @@ impl Parser {
         let name = match &name_tok.kind {
             TokenKind::Ident(s) => s.to_lowercase(),
             _ => {
-                self.error(name_line, name_col, "E002", "Expected directive name after @", None);
+                self.error(
+                    name_line,
+                    name_col,
+                    "E002",
+                    "Expected directive name after @",
+                    None,
+                );
                 self.skip_to_newline();
                 return None;
             }
@@ -183,7 +209,13 @@ impl Parser {
             Some(TokenKind::Ident(s)) => s.clone(),
             Some(TokenKind::QuotedString(s)) => s.clone(),
             _ => {
-                self.error(span_line, span_col, "E003", &format!("Expected value for @{}", name), None);
+                self.error(
+                    span_line,
+                    span_col,
+                    "E003",
+                    &format!("Expected value for @{}", name),
+                    None,
+                );
                 self.skip_to_newline();
                 return None;
             }
@@ -192,30 +224,45 @@ impl Parser {
         self.expect_newline_or_end();
 
         match name.as_str() {
-            "direction" | "dir" => {
-                match value.to_lowercase().as_str() {
-                    "down" | "vertical" | "tb" | "top-bottom" => Some(Directive::Direction(Direction::Down)),
-                    "right" | "horizontal" | "lr" | "left-right" => Some(Directive::Direction(Direction::Right)),
-                    _ => {
-                        self.warn(span_line, span_col, "W002", &format!("Unknown direction '{}', using 'down'", value));
-                        Some(Directive::Direction(Direction::Down))
-                    }
+            "direction" | "dir" => match value.to_lowercase().as_str() {
+                "down" | "vertical" | "tb" | "top-bottom" => {
+                    Some(Directive::Direction(Direction::Down))
                 }
-            }
+                "right" | "horizontal" | "lr" | "left-right" => {
+                    Some(Directive::Direction(Direction::Right))
+                }
+                _ => {
+                    self.warn(
+                        span_line,
+                        span_col,
+                        "W002",
+                        &format!("Unknown direction '{}', using 'down'", value),
+                    );
+                    Some(Directive::Direction(Direction::Down))
+                }
+            },
             "theme" => Some(Directive::Theme(value.to_lowercase())),
-            "spacing" => {
-                match value.to_lowercase().as_str() {
-                    "compact" => Some(Directive::Spacing(Spacing::Compact)),
-                    "normal" => Some(Directive::Spacing(Spacing::Normal)),
-                    "wide" => Some(Directive::Spacing(Spacing::Wide)),
-                    _ => {
-                        self.warn(span_line, span_col, "W003", &format!("Unknown spacing '{}', using 'normal'", value));
-                        Some(Directive::Spacing(Spacing::Normal))
-                    }
+            "spacing" => match value.to_lowercase().as_str() {
+                "compact" => Some(Directive::Spacing(Spacing::Compact)),
+                "normal" => Some(Directive::Spacing(Spacing::Normal)),
+                "wide" => Some(Directive::Spacing(Spacing::Wide)),
+                _ => {
+                    self.warn(
+                        span_line,
+                        span_col,
+                        "W003",
+                        &format!("Unknown spacing '{}', using 'normal'", value),
+                    );
+                    Some(Directive::Spacing(Spacing::Normal))
                 }
-            }
+            },
             _ => {
-                self.warn(span_line, span_col, "W004", &format!("Unknown directive '@{}'", name));
+                self.warn(
+                    span_line,
+                    span_col,
+                    "W004",
+                    &format!("Unknown directive '@{}'", name),
+                );
                 None
             }
         }
@@ -223,7 +270,11 @@ impl Parser {
 
     fn parse_group(&mut self) -> Option<Group> {
         let group_tok = self.advance().unwrap(); // consume 'group'
-        let span = Span { line: group_tok.line, col: group_tok.col, len: group_tok.len };
+        let span = Span {
+            line: group_tok.line,
+            col: group_tok.col,
+            len: group_tok.len,
+        };
 
         // Label (required)
         let label = match self.peek().map(|t| &t.kind) {
@@ -250,9 +301,17 @@ impl Parser {
         // Opening brace
         self.skip_newlines();
         match self.peek().map(|t| &t.kind) {
-            Some(TokenKind::LBrace) => { self.advance(); }
+            Some(TokenKind::LBrace) => {
+                self.advance();
+            }
             _ => {
-                self.error(span.line, span.col, "E005", "Expected '{' after group label", None);
+                self.error(
+                    span.line,
+                    span.col,
+                    "E005",
+                    "Expected '{' after group label",
+                    None,
+                );
                 self.skip_to_newline();
                 return None;
             }
@@ -262,7 +321,9 @@ impl Parser {
         let mut members = Vec::new();
         loop {
             self.skip_newlines();
-            if self.at_end() { break; }
+            if self.at_end() {
+                break;
+            }
 
             match self.peek().map(|t| &t.kind) {
                 Some(TokenKind::RBrace) => {
@@ -285,8 +346,12 @@ impl Parser {
                                 self.pos = saved;
                                 let mut temp_doc = Document::default();
                                 self.parse_node_or_connection(&mut temp_doc);
-                                for n in temp_doc.nodes { members.push(GroupMember::Node(n)); }
-                                for c in temp_doc.connections { members.push(GroupMember::Connection(c)); }
+                                for n in temp_doc.nodes {
+                                    members.push(GroupMember::Node(n));
+                                }
+                                for c in temp_doc.connections {
+                                    members.push(GroupMember::Connection(c));
+                                }
                                 continue;
                             }
                         }
@@ -309,7 +374,12 @@ impl Parser {
             }
         }
 
-        Some(Group { label, tags, members, span })
+        Some(Group {
+            label,
+            tags,
+            members,
+            span,
+        })
     }
 
     fn parse_group_ident_line(&mut self, members: &mut Vec<GroupMember>) {
@@ -330,7 +400,9 @@ impl Parser {
                 self.pos = saved;
                 let mut temp_doc = Document::default();
                 self.parse_ident_line(&mut temp_doc);
-                for c in temp_doc.connections { members.push(GroupMember::Connection(c)); }
+                for c in temp_doc.connections {
+                    members.push(GroupMember::Connection(c));
+                }
             }
             Some(TokenKind::Comma) => {
                 // It's a comma-separated list of refs
@@ -373,7 +445,11 @@ impl Parser {
 
     fn parse_include(&mut self) -> Option<Include> {
         let inc_tok = self.advance().unwrap(); // consume 'include'
-        let span = Span { line: inc_tok.line, col: inc_tok.col, len: inc_tok.len };
+        let span = Span {
+            line: inc_tok.line,
+            col: inc_tok.col,
+            len: inc_tok.len,
+        };
 
         let path = match self.peek().map(|t| &t.kind) {
             Some(TokenKind::QuotedString(s)) => {
@@ -382,7 +458,13 @@ impl Parser {
                 s
             }
             _ => {
-                self.error(span.line, span.col, "E007", "Expected quoted path after 'include'", None);
+                self.error(
+                    span.line,
+                    span.col,
+                    "E007",
+                    "Expected quoted path after 'include'",
+                    None,
+                );
                 self.skip_to_newline();
                 return None;
             }
@@ -415,7 +497,9 @@ impl Parser {
                 doc.nodes.push(node);
                 // Parse connection(s)
                 while let Some(tok) = self.peek() {
-                    if !tok.kind.is_arrow() { break; }
+                    if !tok.kind.is_arrow() {
+                        break;
+                    }
                     if let Some(conn) = self.parse_connection_from(&node_id) {
                         // If the target is a new node declaration, add it too
                         doc.connections.push(conn);
@@ -433,9 +517,15 @@ impl Parser {
     /// Try to parse a node declaration: TYPE IDENT [LABEL] [TAGS]
     fn try_parse_node_decl(&mut self) -> Option<Node> {
         let type_tok = self.peek()?;
-        if !type_tok.kind.is_node_type() { return None; }
+        if !type_tok.kind.is_node_type() {
+            return None;
+        }
 
-        let span = Span { line: type_tok.line, col: type_tok.col, len: type_tok.len };
+        let span = Span {
+            line: type_tok.line,
+            col: type_tok.col,
+            len: type_tok.len,
+        };
         let node_type = type_tok.kind.to_node_type().unwrap();
         self.advance(); // consume type
 
@@ -451,10 +541,18 @@ impl Parser {
                 let s = s.clone();
                 self.advance();
                 // Generate a sanitized ID from the string
-                s.chars().filter(|c| c.is_alphanumeric() || *c == '_' || *c == '-').collect::<String>()
+                s.chars()
+                    .filter(|c| c.is_alphanumeric() || *c == '_' || *c == '-')
+                    .collect::<String>()
             }
             _ => {
-                self.error(span.line, span.col, "E008", &format!("Expected name after '{}'", node_type.as_str()), None);
+                self.error(
+                    span.line,
+                    span.col,
+                    "E008",
+                    &format!("Expected name after '{}'", node_type.as_str()),
+                    None,
+                );
                 return None;
             }
         };
@@ -472,15 +570,27 @@ impl Parser {
         // Optional tags
         let tags = self.try_parse_tags();
 
-        Some(Node { node_type, id, label, tags, span })
+        Some(Node {
+            node_type,
+            id,
+            label,
+            tags,
+            span,
+        })
     }
 
     /// Parse a connection starting from a known source ID.
     fn parse_connection_from(&mut self, from_id: &str) -> Option<Connection> {
         let arrow_tok = self.peek()?;
-        if !arrow_tok.kind.is_arrow() { return None; }
+        if !arrow_tok.kind.is_arrow() {
+            return None;
+        }
 
-        let span = Span { line: arrow_tok.line, col: arrow_tok.col, len: arrow_tok.len };
+        let span = Span {
+            line: arrow_tok.line,
+            col: arrow_tok.col,
+            len: arrow_tok.len,
+        };
         let arrow = arrow_tok.kind.to_arrow_kind().unwrap();
         self.advance(); // consume arrow
 
@@ -526,7 +636,13 @@ impl Parser {
                 Some((s, None))
             }
             _ => {
-                self.error(tok_line, tok_col, "E009", "Expected target node in connection", None);
+                self.error(
+                    tok_line,
+                    tok_col,
+                    "E009",
+                    "Expected target node in connection",
+                    None,
+                );
                 self.skip_to_newline();
                 None
             }
@@ -673,7 +789,10 @@ mod tests {
         assert_eq!(result.document.connections.len(), 1);
         assert_eq!(result.document.connections[0].from, "Auth");
         assert_eq!(result.document.connections[0].to, "API");
-        assert_eq!(result.document.connections[0].label.as_deref(), Some("validate"));
+        assert_eq!(
+            result.document.connections[0].label.as_deref(),
+            Some("validate")
+        );
     }
 
     #[test]
