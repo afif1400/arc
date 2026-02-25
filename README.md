@@ -33,8 +33,7 @@ Every diagram tool today was designed for humans. **arc is designed for LLMs.**
 ### Homebrew (macOS/Linux)
 
 ```bash
-brew tap afif1400/tap
-brew install arc
+brew install afif1400/tap/arc-lang
 ```
 
 ### Cargo (crates.io)
