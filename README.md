@@ -30,20 +30,29 @@ Every diagram tool today was designed for humans. **arc is designed for LLMs.**
 
 ## Install
 
-### From source (requires Rust)
+### Homebrew (macOS/Linux)
+
+```bash
+brew tap afif1400/tap
+brew install arc
+```
+
+### Cargo (crates.io)
+
+```bash
+cargo install arc-lang
+```
+
+### Pre-built binaries
+
+Download from [GitHub Releases](https://github.com/afif1400/arc/releases/latest) — available for macOS (Intel & Apple Silicon), Linux (x86 & ARM), and Windows.
+
+### From source
 
 ```bash
 git clone https://github.com/afif1400/arc.git
 cd arc
 cargo install --path .
-```
-
-### Binary
-
-```bash
-# After building
-cargo build --release
-# Binary at target/release/arc (670KB)
 ```
 
 ## Quick Start
